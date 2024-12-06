@@ -10,17 +10,15 @@ import pandas as pd
 from joblib import load
 
 from models import Prediction, Base
-
-
 from datetime import datetime
 import pytz
 
-
+# Configurar la base de datos
 SQLALCHEMY_DATABASE_URL = "mysql+pymysql://root:wVfztbtVUcHmAbPovfHbnFbIAXMgNHvT@junction.proxy.rlwy.net:48943/railway"
 
 engine = create_engine(SQLALCHEMY_DATABASE_URL)
 metadata = MetaData()
-
+ 
 # Cargar la tabla existente
 items = Table("items", metadata, autoload_with=engine)
 
