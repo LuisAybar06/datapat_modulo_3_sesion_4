@@ -1,0 +1,9 @@
+fastapi
+uvicorn
+databases
+sqlalchemy
+pandas
+scikit-learn
+
+pymysql
+python-multipart
