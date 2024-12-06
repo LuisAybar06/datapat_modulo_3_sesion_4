@@ -21,21 +21,38 @@ SQLALCHEMY_DATABASE_URL = "mysql+pymysql://root:wVfztbtVUcHmAbPovfHbnFbIAXMgNHvT
 engine = create_engine(SQLALCHEMY_DATABASE_URL)
 metadata = MetaData()
 
-
+# Cargar la tabla existente
 items = Table("items", metadata, autoload_with=engine)
 
+# Configurar la sesión de SQLAlchemy
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 
+
+# Inicializar la aplicación FastAPI
 app = FastAPI()
 
+def get_db():
+    db = SessionLocal()
+    try:
+        yield db
+    finally:
+        db.close()
 
+@app.get("/health", status_code=200, include_in_schema=False)
+def health_check(db=Depends(get_db)):
+    """This is the health check endpoint"""
+    return {"status": "ok"}
+ 
+# Operaciones CRUD 
+
+# Definir los modelos Pydantic
 class Item(BaseModel):
     id: int
     name: str
     description: str = None
 
     class Config:
-        from_attributes = True
+        orm_mode = True
 
 class ItemCreate(BaseModel):
     name: str
@@ -45,23 +62,9 @@ class ItemUpdate(ItemCreate):
     pass
 
 
-
-def get_db():
-    db = SessionLocal()
-    try:
-        yield db
-    finally:
-        db.close()
-
-@app.get("/health", status_code = 200)
-def health_check(db=Depends(get_db)):
-    return {"status": "ok"}
-
-
-
 # Leer un elemento específico de la tabla
 @app.get("/items/{item_id}", response_model=Item)
-async def read_item(item_id: int):
+def read_item(item_id: int):
     with SessionLocal() as session:
         query = select(items).where(items.c.id == item_id)
         db_item = session.execute(query).fetchone()
@@ -78,8 +81,13 @@ def create_item(item: ItemCreate):
         session.commit()
         created_item_id = result.inserted_primary_key[0]
         created_item = session.execute(select(items).where(items.c.id == created_item_id)).fetchone()
+
+        if created_item is None:
+                raise Exception(f"Item with ID {created_item_id} not found in database.")
+        
         return created_item._mapping
 
+    
 # Actualizar un elemento existente en la tabla
 @app.put("/items/{item_id}", response_model=Item)
 def update_item(item_id: int, item: ItemUpdate):
@@ -118,8 +126,6 @@ def get_items(skip: int = 0, limit: int = 10):
         query = select(items).offset(skip).limit(limit)
         results = session.execute(query).fetchall()
         return [result._mapping for result in results]
-    
-
 
 
 @app.post("/predict")
@@ -128,28 +134,27 @@ async def predict_bancknote(file: UploadFile = File(...), db: Session = Depends(
     
     features_df = pd.read_csv('selected_features.csv')
     features = features_df['0'].to_list()
-
+    
     contents = await file.read()
     df = pd.read_csv(StringIO(contents.decode('utf-8')))
     df = df[features]
-
-
+    
     predictions = classifier.predict(df)
 
-    lima_tz = pytz.timezone("America/Lima")
+    lima_tz = pytz.timezone('America/Lima')
     now = datetime.now(lima_tz)
-
-
+ 
     for i, prediction in enumerate(predictions):
         prediction_entry = Prediction(
-            file_name = file.filename,
-            prediction = prediction,
-            create_at = now
+            file_name=file.filename,
+            prediction=prediction,
+            created_at=now   
         )
         db.add(prediction_entry)
-
+    
     db.commit()
     
     return {
         "predictions": predictions.tolist()
     }
+
