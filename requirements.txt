@@ -2,8 +2,14 @@ fastapi
 uvicorn
 databases
 sqlalchemy
-pandas
+joblib
 scikit-learn
-
+pandas
 pymysql
 python-multipart
+pyngrok
+
+
+PyJWT
+passlib
+bcrypt
